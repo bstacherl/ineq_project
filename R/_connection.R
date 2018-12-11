@@ -12,5 +12,3 @@ if(!exists("pg")) {
 } else {
   message("Connection pg already exists.")
 }
-#test test
-x=NULL
