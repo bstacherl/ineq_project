@@ -9,6 +9,7 @@
 library(dplyr)
 library(survey)
 library(convey)
+library(plyr)
 
 # Source the Setup scripts to provide merged household and personal data
 source("R/_connection.R")
@@ -137,11 +138,19 @@ silc.rphd <- silc.rphd %>%
 # Subsetting --------------------------------------------------------------
 
 # To get useful results we may want to subset to only positive income
+# subset to year 2016
+# indicators are calculated for 2016 (Zeitreihe für alle Jahre)
 silc.rphd.inc <- silc.rphd %>% filter(
-  disp.inc.1 > 0 & nat.inc.1 > 0 & fac.inc.1 > 0)
+  disp.inc.1 > 0 & nat.inc.1 > 0 & 
+    fac.inc.1 > 0 & rb010 == 2016)
+
 silc.rphd.inc2 <- silc.rphd.2 %>% filter(
-    fac.inc.2 > 0 & nat.inc.2 > 0 & disp.inc.2 > 0)
-silc.rphd.inc.h <- silc.rphd %>% filter(disp.inc.h > 0)
+    fac.inc.2 > 0 & nat.inc.2 > 0 & 
+      disp.inc.2 > 0 & rb010 == 2016)
+
+silc.rphd.inc.h <- silc.rphd %>% filter(
+  fac.inc.h > 0 & nat.inc.h >0 & 
+    disp.inc.h > 0 & rb010 ==2016)
 
 
 # Creating Survey Objects -------------------------------------------------
@@ -162,7 +171,7 @@ silc.h.svy <- svydesign(ids = ~id_h,
                          data = silc.rphd.inc.h) %>% convey_prep()
 
 
-# Indicators (Personenebene) --------------------------------------------------------------
+# Indicators (2016) --------------------------------------------------------------
 
 # Mean Income
 mean.1 <- c(
@@ -265,3 +274,265 @@ gini.h <- c(
   svygini(~fac.inc.h, silc.h.svy),
   svygini(~nat.inc.h, silc.h.svy),
   svygini(~disp.inc.h, silc.h.svy))
+
+#-------------------------------------------------------
+
+# Zeitreihen -------------------------------------------
+
+# subsets mit allen Jahren
+
+silc.rphd.ts1 <- silc.rphd %>% filter(
+  disp.inc.1 > 0 & nat.inc.1 > 0 & fac.inc.1 > 0)
+
+silc.rphd.ts2 <- silc.rphd.2 %>% filter(
+  fac.inc.2 > 0 & nat.inc.2 > 0 & disp.inc.2 > 0)
+
+silc.rphd.tsh <- silc.rphd %>% filter(
+  fac.inc.h > 0 & nat.inc.h >0 & disp.inc.h > 0)
+
+
+# Creating Survey Objects -------------------------------------------------
+
+silc.ts1.svy <- svydesign(ids =  ~ id_h,
+                        strata = ~rb020,
+                        weights = ~pb040,
+                        data = silc.rphd.ts1) %>% convey_prep()
+
+silc.ts2.svy <- svydesign(ids =  ~ id_h,
+                         strata = ~rb020,
+                         weights = ~pb040,
+                         data = silc.rphd.ts2) %>% convey_prep()
+
+silc.tsh.svy <- svydesign(ids = ~id_h,
+                        strata = ~rb020,
+                        weights = ~db090,
+                        data = silc.rphd.tsh) %>% convey_prep()
+
+# ---------------------------------------------------------------------
+
+# Indicators (Zeitreihen) -----------------------------------------
+
+# Mean Income
+
+mean.ts1 <- bind_cols(svyby(~fac.inc.1, ~rb010, silc.ts1.svy, 
+                            svymean, keep.var = FALSE),
+                      svyby(~nat.inc.1, ~rb010, silc.ts1.svy, 
+                            svymean, keep.var = FALSE), 
+                      svyby(~disp.inc.1, ~rb010, silc.ts1.svy, 
+                            svymean, keep.var = FALSE))
+
+mean.ts1 <- rename(mean.ts1, c(
+  "statistic"="fac.inc", "statistic1"="nat.inc", "statistic2"="disp.inc"))
+
+mean.ts2 <- bind_cols(svyby(~fac.inc.2, ~rb010, silc.ts2.svy, 
+                            svymean, keep.var = FALSE),
+                      svyby(~nat.inc.2, ~rb010, silc.ts2.svy, 
+                            svymean, keep.var = FALSE), 
+                      svyby(~disp.inc.2, ~rb010, silc.ts2.svy, 
+                            svymean, keep.var = FALSE))
+
+mean.ts2 <- rename(mean.ts2, c(
+  "statistic"="fac.inc", "statistic1"="nat.inc", "statistic2"="disp.inc"))
+
+mean.tsh <- bind_cols(svyby(~fac.inc.h, ~rb010, silc.tsh.svy, 
+                            svymean, keep.var = FALSE),
+                      svyby(~nat.inc.h, ~rb010, silc.tsh.svy, 
+                            svymean, keep.var = FALSE), 
+                      svyby(~disp.inc.h, ~rb010, silc.tsh.svy, 
+                            svymean, keep.var = FALSE))
+
+mean.tsh <- rename(mean.tsh, c(
+  "statistic"="fac.inc", "statistic1"="nat.inc", "statistic2"="disp.inc"))
+
+# Median Income
+
+median.ts1 <- bind_cols(svyby(~fac.inc.1, ~rb010, silc.ts1.svy, 
+                              svyquantile, quantiles = 0.5, keep.var = FALSE),
+                      svyby(~nat.inc.1, ~rb010, silc.ts1.svy, 
+                            svyquantile, quantiles = 0.5, keep.var = FALSE), 
+                      svyby(~disp.inc.1, ~rb010, silc.ts1.svy, 
+                            svyquantile, quantiles = 0.5, keep.var = FALSE))
+
+meadian.ts1 <- rename(median.ts1, c(
+  "statistic"="fac.inc", "statistic1"="nat.inc", "statistic2"="disp.inc"))
+
+median.ts2 <- bind_cols(svyby(~fac.inc.2, ~rb010, silc.ts2.svy, 
+                              svyquantile, quantiles = 0.5, keep.var = FALSE),
+                      svyby(~nat.inc.2, ~rb010, silc.ts2.svy, 
+                            svyquantile, quantiles = 0.5, keep.var = FALSE), 
+                      svyby(~disp.inc.2, ~rb010, silc.ts2.svy, 
+                            svyquantile, quantiles = 0.5, keep.var = FALSE))
+
+median.ts2 <- rename(median.ts2, c(
+  "statistic"="fac.inc", "statistic1"="nat.inc", "statistic2"="disp.inc"))
+
+median.tsh <- bind_cols(svyby(~fac.inc.h, ~rb010, silc.tsh.svy, 
+                              svyquantile, quantiles = 0.5, keep.var = FALSE),
+                      svyby(~nat.inc.h, ~rb010, silc.tsh.svy, 
+                            svyquantile, quantiles = 0.5, keep.var = FALSE), 
+                      svyby(~disp.inc.h, ~rb010, silc.tsh.svy, 
+                            svyquantile, quantiles = 0.5, keep.var = FALSE))
+
+median.tsh <- rename(median.tsh, c(
+  "statistic"="fac.inc", "statistic1"="nat.inc", "statistic2"="disp.inc"))
+
+# Quantile Ratio Share (P80/P20)
+
+qsr.ts1 <- bind_cols(svyby(~fac.inc.1, ~rb010, silc.ts1.svy, 
+                            svyqsr, keep.var = FALSE),
+                      svyby(~nat.inc.1, ~rb010, silc.ts1.svy, 
+                            svyqsr, keep.var = FALSE), 
+                      svyby(~disp.inc.1, ~rb010, silc.ts1.svy, 
+                            svyqsr, keep.var = FALSE))
+
+qsr.ts1 <- rename(qsr.ts1, c(
+  "statistic"="fac.inc", "statistic1"="nat.inc", "statistic2"="disp.inc"))
+
+qsr.ts2 <- bind_cols(svyby(~fac.inc.2, ~rb010, silc.ts2.svy, 
+                           svyqsr, keep.var = FALSE),
+                      svyby(~nat.inc.2, ~rb010, silc.ts2.svy, 
+                            svyqsr, keep.var = FALSE), 
+                      svyby(~disp.inc.2, ~rb010, silc.ts2.svy, 
+                            svyqsr, keep.var = FALSE))
+
+qsr.ts2 <- rename(qsr.ts2, c(
+  "statistic"="fac.inc", "statistic1"="nat.inc", "statistic2"="disp.inc"))
+
+qsr.tsh <- bind_cols(svyby(~fac.inc.h, ~rb010, silc.tsh.svy, 
+                           svyqsr, keep.var = FALSE),
+                      svyby(~nat.inc.h, ~rb010, silc.tsh.svy, 
+                            svyqsr, keep.var = FALSE), 
+                      svyby(~disp.inc.h, ~rb010, silc.tsh.svy, 
+                            svyqsr, keep.var = FALSE))
+
+qsr.tsh <- rename(qsr.tsh, c(
+  "statistic"="fac.inc", "statistic1"="nat.inc", "statistic2"="disp.inc"))
+
+# Top 10% Income share
+
+# 10% share for P1 (factor income, national income and disposable income)
+top.ts1.f.svy <- subset(silc.ts1.svy, fac.inc.1 >= as.numeric(
+  svyquantile(~fac.inc.1, silc.ts1.svy, quantile=c(0.9))))
+topnum <- svyby(~fac.inc.1, ~rb010, top.ts1.f.svy, svytotal)
+topden <- svyby(~fac.inc.1, ~rb010, silc.ts1.svy, svytotal)
+top.ts1.f <- topnum / topden
+
+top.ts1.n.svy <- subset(silc.ts1.svy, nat.inc.1 >= as.numeric(
+  svyquantile(~nat.inc.1, silc.ts1.svy, quantile=c(0.9))))
+topnum <- svyby(~nat.inc.1, ~rb010, top.ts1.n.svy, svytotal)
+topden <- svyby(~nat.inc.1, ~rb010, silc.ts1.svy, svytotal)
+top.ts1.n <- topnum / topden
+
+top.ts1.d.svy <- subset(silc.ts1.svy, disp.inc.1 >= as.numeric(
+  svyquantile(~disp.inc.1, silc.ts1.svy, quantile=c(0.9))))
+topnum <- svyby(~disp.inc.1, ~rb010, top.ts1.d.svy, svytotal)
+topden <- svyby(~disp.inc.1, ~rb010, silc.ts1.svy, svytotal)
+top.ts1.d <- topnum / topden
+
+rb010 <- c(2006 : 2017)
+
+top.ts1 <- as.data.frame(cbind(rb010, top.ts1.f[,2], top.ts1.n[,2], top.ts1.d[,2]))
+
+top.ts1 <- rename(top.ts1, c("V2" = "fac.inc",
+                             "V3" = "nat.inc",
+                             "V4" = "disp.inc" ))
+
+# 10% share for P2 (factor income, national income and disposable income)
+top.ts2.f.svy <- subset(silc.ts2.svy, fac.inc.2 >= as.numeric(
+  svyquantile(~fac.inc.2, silc.ts2.svy, quantile=c(0.9))))
+topnum <- svyby(~fac.inc.2, ~rb010, top.ts2.f.svy, svytotal)
+topden <- svyby(~fac.inc.2, ~rb010, silc.ts2.svy, svytotal)
+top.ts2.f <- topnum / topden
+
+top.ts2.n.svy <- subset(silc.ts2.svy, nat.inc.2 >= as.numeric(
+  svyquantile(~nat.inc.2, silc.ts2.svy, quantile=c(0.9))))
+topnum <- svyby(~nat.inc.2, ~rb010, top.ts2.n.svy, svytotal)
+topden <- svyby(~nat.inc.2, ~rb010, silc.ts2.svy, svytotal)
+top.ts2.n <- topnum / topden
+
+top.ts2.d.svy <- subset(silc.ts2.svy, disp.inc.2 >= as.numeric(
+  svyquantile(~disp.inc.2, silc.ts2.svy, quantile=c(0.9))))
+topnum <- svyby(~disp.inc.2, ~rb010, top.ts2.d.svy, svytotal)
+topden <- svyby(~disp.inc.2, ~rb010, silc.ts2.svy, svytotal)
+top.ts2.d <- topnum / topden
+
+top.ts2 <- as.data.frame(cbind(rb010, top.ts2.f[,2], top.ts2.n[,2], top.ts2.d[,2]))
+
+top.ts2 <- rename(top.ts2, c("V2" = "fac.inc",
+                             "V3" = "nat.inc",
+                             "V4" = "disp.inc" ))
+
+# 10% share for P1 (factor income, national income and disposable income)
+top.tsh.f.svy <- subset(silc.tsh.svy, fac.inc.h >= as.numeric(
+  svyquantile(~fac.inc.h, silc.tsh.svy, quantile=c(0.9))))
+topnum <- svyby(~fac.inc.h, ~rb010, top.tsh.f.svy, svytotal)
+topden <- svyby(~fac.inc.h, ~rb010, silc.tsh.svy, svytotal)
+top.tsh.f <- topnum / topden
+
+top.tsh.n.svy <- subset(silc.tsh.svy, nat.inc.h >= as.numeric(
+  svyquantile(~nat.inc.h, silc.tsh.svy, quantile=c(0.9))))
+topnum <- svyby(~nat.inc.h, ~rb010, top.tsh.n.svy, svytotal)
+topden <- svyby(~nat.inc.h, ~rb010, silc.tsh.svy, svytotal)
+top.tsh.n <- topnum / topden
+
+top.tsh.d.svy <- subset(silc.tsh.svy, disp.inc.h >= as.numeric(
+  svyquantile(~disp.inc.h, silc.tsh.svy, quantile=c(0.9))))
+topnum <- svyby(~disp.inc.h, ~rb010, top.tsh.d.svy, svytotal)
+topden <- svyby(~disp.inc.h, ~rb010, silc.tsh.svy, svytotal)
+top.tsh.d <- topnum / topden
+
+top.tsh <- as.data.frame(cbind(rb010, top.tsh.f[,2], top.tsh.n[,2], top.tsh.d[,2]))
+
+top.tsh <- rename(top.tsh, c("V2" = "fac.inc",
+                             "V3" = "nat.inc",
+                             "V4" = "disp.inc" ))
+
+# Gini Coefficient
+
+gini.ts1 <- bind_cols(svyby(~fac.inc.1, ~rb010, silc.ts1.svy, 
+                            svygini, keep.var = FALSE),
+                      svyby(~nat.inc.1, ~rb010, silc.ts1.svy, 
+                            svygini, keep.var = FALSE), 
+                      svyby(~disp.inc.1, ~rb010, silc.ts1.svy, 
+                            svygini, keep.var = FALSE))
+
+gini.ts1 <- rename(gini.ts1, c(
+  "statistic"="fac.inc", "statistic1"="nat.inc", "statistic2"="disp.inc"))
+
+gini.ts2 <- bind_cols(svyby(~fac.inc.2, ~rb010, silc.ts2.svy, 
+                            svygini, keep.var = FALSE),
+                      svyby(~nat.inc.2, ~rb010, silc.ts2.svy, 
+                            svygini, keep.var = FALSE), 
+                      svyby(~disp.inc.2, ~rb010, silc.ts2.svy, 
+                            svygini, keep.var = FALSE))
+
+gini.ts2 <- rename(gini.ts2, c(
+  "statistic"="fac.inc", "statistic1"="nat.inc", "statistic2"="disp.inc"))
+
+gini.tsh <- bind_cols(svyby(~fac.inc.h, ~rb010, silc.tsh.svy, 
+                            svygini, keep.var = FALSE),
+                      svyby(~nat.inc.h, ~rb010, silc.tsh.svy, 
+                            svygini, keep.var = FALSE), 
+                      svyby(~disp.inc.h, ~rb010, silc.tsh.svy, 
+                            svygini, keep.var = FALSE))
+
+gini.tsh <- rename(gini.tsh, c(
+  "statistic"="fac.inc", "statistic1"="nat.inc", "statistic2"="disp.inc"))
+
+library(ggplot2)
+ggplot(gini.ts1, aes(x=rb010, y=fac.inc)) + 
+  geom_line(aes(y=fac.inc, color = "Faktoreinkommen")) +
+  geom_point(aes(y=fac.inc)) +
+  geom_line(aes(y=nat.inc, color = "Nationaleinkommen")) +
+  geom_point(aes(y=nat.inc)) +
+  geom_line(aes(y=disp.inc, color = "verfügbares Einkommen")) +
+  geom_point(aes(y=disp.inc)) +
+  labs(x = "", y="Gini") + 
+  theme(panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(), 
+        panel.background = element_blank(), 
+        axis.line = element_line(colour = "black")) + 
+  ggtitle("Gini Koeffizient Spanien (Personeneinkommen)") + 
+  scale_x_continuous(breaks = seq(2005, 2018, by = 2)) +
+  scale_y_continuous(breaks = seq(0.25, 0.55, by = 0.05), limits = c(0.25, 0.55)) +
+  scale_color_manual(values = c('Faktoreinkommen' = 'blue', 'Nationaleinkommen' = 'red', "verfügbares Einkommen" = "green"))
